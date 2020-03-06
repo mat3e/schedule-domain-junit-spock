@@ -1,0 +1,29 @@
+plugins {
+    id 'org.springframework.boot' version '2.2.5.RELEASE'
+    id 'io.spring.dependency-management' version '1.0.9.RELEASE'
+    id 'java'
+    id 'groovy'
+}
+
+ext['groovy.version'] = '3.0.1'
+
+group = 'io.github.mat3e'
+version = '0.0.1-SNAPSHOT'
+sourceCompatibility = '11'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter'
+    testImplementation('org.springframework.boot:spring-boot-starter-test') {
+        exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+    }
+    testImplementation 'org.codehaus.groovy:groovy-all:3.0.1'
+    testImplementation 'org.spockframework:spock-core:2.0-M2-groovy-3.0'
+}
+
+test {
+    useJUnitPlatform()
+}
