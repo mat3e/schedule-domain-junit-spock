@@ -3,19 +3,14 @@ package io.github.mat3e.schedule.domain;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZonedDateTime;
 
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTimeout;
-import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertSame;
 
+@Tag("unit")
 class ScheduleTest {
     private Schedule toTest;
 
@@ -31,7 +26,7 @@ class ScheduleTest {
         var start = ZonedDateTime.now();
         var end = start.plusHours(2);
         // and
-        toTest.scheduleOnCall(ScheduleEntry.of(exampleSurgeon(), start, end));
+        toTest.scheduleOnCall(exampleEntry(start, end));
 
         // when
         var laterStart = start.plusHours(1);
@@ -39,7 +34,7 @@ class ScheduleTest {
         // then
         assertThrows(
                 DateAlreadyTakenException.class,
-                () -> toTest.scheduleOnCall(ScheduleEntry.of(exampleSurgeon(), laterStart, end))
+                () -> toTest.scheduleOnCall(exampleEntry(laterStart, end))
         );
     }
 
@@ -76,6 +71,11 @@ class ScheduleTest {
     @Test
     @DisplayName("should override on call")
     void overrideOnCall_worksAsExpected() {
+    }
+
+    @NotNull
+    private static ScheduleEntry exampleEntry(ZonedDateTime from, ZonedDateTime to) {
+        return new ScheduleEntry(exampleSurgeon(), from, to);
     }
 
     @NotNull

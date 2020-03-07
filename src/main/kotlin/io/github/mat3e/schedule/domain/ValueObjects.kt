@@ -13,12 +13,15 @@ data class ScheduleEntry(
         val from: ZonedDateTime,
         val to: ZonedDateTime
 ) {
-    companion object {
-        @JvmStatic
-        fun of(doctor: Doctor, from: ZonedDateTime, to: ZonedDateTime) = ScheduleEntry(doctor, from, to)
+    private val range = from..to
+
+    init {
+        if (range.isEmpty()) {
+            throw IllegalArgumentException("$from should be less than $to")
+        }
     }
 
-    fun interferesWith(other: ScheduleEntry): Boolean = interferesWith(other.from)
-
-    private fun interferesWith(date: ZonedDateTime): Boolean = date.isAfter(from) && date.isBefore(to)
+    fun interferesWith(other: ScheduleEntry): Boolean = other.from within this.range || this.from within other.range
 }
+
+private infix fun ZonedDateTime.within(range: ClosedRange<ZonedDateTime>): Boolean = this in range && this < range.endInclusive

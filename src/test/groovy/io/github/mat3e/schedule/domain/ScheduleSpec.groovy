@@ -3,7 +3,10 @@ package io.github.mat3e.schedule.domain
 import spock.lang.Specification
 import spock.lang.Subject
 
+import java.time.Duration
 import java.time.ZonedDateTime
+
+import static java.time.temporal.ChronoUnit.HOURS
 
 class ScheduleSpec extends Specification {
     @Subject
@@ -16,14 +19,14 @@ class ScheduleSpec extends Specification {
     def 'should throw when scheduling for the taken date'() {
         given:
         def start = ZonedDateTime.now()
-        def end = start.plusHours(2)
+        def end = start + Duration.of(2, HOURS)
         and:
-        toTest.scheduleOnCall(ScheduleEntry.of(exampleSurgeon(), start, end))
+        toTest.scheduleOnCall(exampleEntry(start, end))
 
         when:
-        def laterStart = start.plusHours(1)
+        def laterStart = start + Duration.of(1, HOURS)
         and:
-        toTest.scheduleOnCall(ScheduleEntry.of(exampleSurgeon(), laterStart, end))
+        toTest.scheduleOnCall(exampleEntry(laterStart, end))
 
         then:
         thrown DateAlreadyTakenException
@@ -62,6 +65,10 @@ class ScheduleSpec extends Specification {
     def 'should override on call'() {
         expect:
         true
+    }
+
+    private static ScheduleEntry exampleEntry(ZonedDateTime from, ZonedDateTime to) {
+        new ScheduleEntry(exampleSurgeon(), from, to)
     }
 
     private static Doctor exampleSurgeon() {
