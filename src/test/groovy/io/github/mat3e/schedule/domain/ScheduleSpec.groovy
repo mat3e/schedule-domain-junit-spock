@@ -15,17 +15,15 @@ class ScheduleSpec extends Specification {
 
     def 'should throw when scheduling for the taken date'() {
         given:
-        Doctor first = exampleSurgeon()
         def start = ZonedDateTime.now()
         def end = start.plusHours(2)
         and:
-        toTest.scheduleOnCall(first, start, end)
+        toTest.scheduleOnCall(ScheduleEntry.of(exampleSurgeon(), start, end))
 
         when:
-        Doctor second = exampleSurgeon()
-        def start2 = start.plusHours(1)
+        def laterStart = start.plusHours(1)
         and:
-        toTest.scheduleOnCall(second, start2, end)
+        toTest.scheduleOnCall(ScheduleEntry.of(exampleSurgeon(), laterStart, end))
 
         then:
         thrown DateAlreadyTakenException

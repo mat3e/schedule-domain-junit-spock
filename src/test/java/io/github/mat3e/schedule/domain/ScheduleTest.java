@@ -28,18 +28,19 @@ class ScheduleTest {
     @DisplayName("should throw when scheduling for the taken date")
     void scheduleOnCall_throwsWhenDateAlreadyTaken() {
         // given
-        Doctor first = exampleSurgeon();
         var start = ZonedDateTime.now();
         var end = start.plusHours(2);
         // and
-        toTest.scheduleOnCall(first, start, end);
+        toTest.scheduleOnCall(ScheduleEntry.of(exampleSurgeon(), start, end));
 
         // when
-        Doctor second = exampleSurgeon();
-        var start2 = start.plusHours(1);
+        var laterStart = start.plusHours(1);
 
         // then
-        assertThrows(DateAlreadyTakenException.class, () -> toTest.scheduleOnCall(second, start2, end));
+        assertThrows(
+                DateAlreadyTakenException.class,
+                () -> toTest.scheduleOnCall(ScheduleEntry.of(exampleSurgeon(), laterStart, end))
+        );
     }
 
     @Test

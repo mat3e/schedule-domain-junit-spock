@@ -8,7 +8,7 @@ enum class Specialization {
 
 data class Doctor(val specialization: Specialization)
 
-internal data class ScheduleEntry(
+data class ScheduleEntry(
         val doctor: Doctor,
         val from: ZonedDateTime,
         val to: ZonedDateTime
@@ -18,5 +18,7 @@ internal data class ScheduleEntry(
         fun of(doctor: Doctor, from: ZonedDateTime, to: ZonedDateTime) = ScheduleEntry(doctor, from, to)
     }
 
-    fun interferesWith(date: ZonedDateTime): Boolean = date.isAfter(from) && date.isBefore(to)
+    fun interferesWith(other: ScheduleEntry): Boolean = interferesWith(other.from)
+
+    private fun interferesWith(date: ZonedDateTime): Boolean = date.isAfter(from) && date.isBefore(to)
 }
