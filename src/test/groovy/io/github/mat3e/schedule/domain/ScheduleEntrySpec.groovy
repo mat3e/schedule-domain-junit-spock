@@ -1,6 +1,5 @@
 package io.github.mat3e.schedule.domain
 
-
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Subject
@@ -14,7 +13,7 @@ import static java.time.temporal.ChronoUnit.HOURS
 import static java.time.temporal.ChronoUnit.MINUTES
 import static java.time.temporal.ChronoUnit.SECONDS
 
-@Title("Specification for schedule entries")
+@Title('Specification for schedule entries')
 class ScheduleEntrySpec extends Specification {
     private static final ZonedDateTime start = ZonedDateTime.now()
     private static final ZonedDateTime end = start + of(2, HOURS)
@@ -36,6 +35,11 @@ class ScheduleEntrySpec extends Specification {
     def 'should NOT interfere when new end equal to old start'() {
         expect:
         !entry.interferesWith(exampleEntry(start - of(2, HOURS), start))
+    }
+
+    def 'should NOT interfere when different room'() {
+        expect:
+        !entry.interferesWith(new ScheduleEntry(entry.doctor, start, end, new Room('different')))
     }
 
     @Unroll
@@ -77,8 +81,44 @@ class ScheduleEntrySpec extends Specification {
         thrown IllegalArgumentException
     }
 
+    def 'should add patient'() {
+        given:
+        def toTest = new ScheduleEntry(exampleSurgeon(), start, end, new Room('general'))
+
+        expect:
+        toTest.getPatient() == null
+
+        when:
+        toTest = toTest.withPatient(new Patient('Kowalski'))
+
+        then:
+        toTest.getPatient() != null
+    }
+
+    def 'should throw when adding patient and another patient exists'() {
+        given:
+        def toTest = new ScheduleEntry(
+                exampleSurgeon(),
+                start,
+                end,
+                new Room('general'),
+                new Patient('first')
+        )
+
+        when:
+        toTest.withPatient(new Patient('second'))
+
+        then:
+        thrown DateAlreadyTakenException
+    }
+
     private static ScheduleEntry exampleEntry(ZonedDateTime from, ZonedDateTime to) {
-        new ScheduleEntry(exampleSurgeon(), from, to)
+        new ScheduleEntry(
+                exampleSurgeon(),
+                from,
+                to,
+                new Room('foo')
+        )
     }
 
     private static Doctor exampleSurgeon() {

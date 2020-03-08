@@ -68,7 +68,13 @@ class ScheduleSpec extends Specification {
     }
 
     private static ScheduleEntry exampleEntry(ZonedDateTime from, ZonedDateTime to) {
-        new ScheduleEntry(exampleSurgeon(), from, to)
+        new ScheduleEntry(
+                exampleSurgeon(),
+                from,
+                to,
+                new Room('foo'),
+                new Patient('bar')
+        )
     }
 
     private static Doctor exampleSurgeon() {

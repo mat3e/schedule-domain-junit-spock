@@ -75,7 +75,13 @@ class ScheduleTest {
 
     @NotNull
     private static ScheduleEntry exampleEntry(ZonedDateTime from, ZonedDateTime to) {
-        return new ScheduleEntry(exampleSurgeon(), from, to);
+        return new ScheduleEntry(
+                exampleSurgeon(),
+                from,
+                to,
+                new Room("foo"),
+                new Patient("bar")
+        );
     }
 
     @NotNull

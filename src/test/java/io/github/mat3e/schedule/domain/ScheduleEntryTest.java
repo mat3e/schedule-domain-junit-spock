@@ -12,6 +12,8 @@ import java.time.ZonedDateTime;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -20,24 +22,30 @@ class ScheduleEntryTest {
     private static final ZonedDateTime start = ZonedDateTime.now();
     private static final ZonedDateTime end = start.plusHours(2);
 
-    private ScheduleEntry toTest = exampleEntry(start, end);
+    private ScheduleEntry entry = exampleEntry(start, end);
 
     @Test
     @DisplayName("should interfere when the same start")
     void interferesWith_itself() {
-        assertTrue(toTest.interferesWith(toTest));
+        assertTrue(entry.interferesWith(entry));
     }
 
     @Test
     @DisplayName("should NOT interfere when new start equal to old end")
     void not_interferesWith_otherWhichStartsOnThisEnds() {
-        assertFalse(toTest.interferesWith(exampleEntry(end, end.plusHours(2))));
+        assertFalse(entry.interferesWith(exampleEntry(end, end.plusHours(2))));
     }
 
     @Test
     @DisplayName("should NOT interfere when new end equal to old start")
     void not_interferesWith_otherWhichEndsOnThisStart() {
-        assertFalse(toTest.interferesWith(exampleEntry(start.minusHours(2), start)));
+        assertFalse(entry.interferesWith(exampleEntry(start.minusHours(2), start)));
+    }
+
+    @Test
+    @DisplayName("should NOT interfere when different room")
+    void not_interferesWith_otherInDifferentRoom() {
+        assertFalse(entry.interferesWith(new ScheduleEntry(entry.getDoctor(), start, end, new Room("different"))));
     }
 
     @ParameterizedTest(name = "{index}: {0}")
@@ -48,7 +56,7 @@ class ScheduleEntryTest {
         ZonedDateTime lateEnd = startBetween.plusHours(2);
 
         // expect
-        assertTrue(toTest.interferesWith(exampleEntry(startBetween, lateEnd)));
+        assertTrue(entry.interferesWith(exampleEntry(startBetween, lateEnd)));
     }
 
     static Stream<String> interferesWith_otherWhichStartsBeforeThisEnds() {
@@ -67,7 +75,7 @@ class ScheduleEntryTest {
         ZonedDateTime newStart = endBetween.minusHours(2);
 
         // expect
-        assertTrue(toTest.interferesWith(exampleEntry(newStart, endBetween)));
+        assertTrue(entry.interferesWith(exampleEntry(newStart, endBetween)));
     }
 
     static Stream<Arguments> endsBetween() {
@@ -88,8 +96,47 @@ class ScheduleEntryTest {
         );
     }
 
+    @Test
+    @DisplayName("should add patient")
+    void addPatient_addsToEmptySchedule() {
+        // given
+        var toTest = new ScheduleEntry(exampleSurgeon(), start, end, new Room("general"));
+        // expect
+        assertNull(toTest.getPatient());
+
+        // when
+        toTest = toTest.withPatient(new Patient("Kowalski"));
+
+        // then
+        assertNotNull(toTest.getPatient());
+    }
+
+    @Test
+    @DisplayName("should throw when adding patient and another patient exists")
+    void addPatient_throwsWhenPatientExists() {
+        // given
+        var toTest = new ScheduleEntry(
+                exampleSurgeon(),
+                start,
+                end,
+                new Room("general"),
+                new Patient("first")
+        );
+
+        // expect
+        assertThrows(
+                DateAlreadyTakenException.class,
+                () -> toTest.withPatient(new Patient("second"))
+        );
+    }
+
     private static ScheduleEntry exampleEntry(ZonedDateTime from, ZonedDateTime to) {
-        return new ScheduleEntry(exampleSurgeon(), from, to);
+        return new ScheduleEntry(
+                exampleSurgeon(),
+                from,
+                to,
+                new Room("foo")
+        );
     }
 
     private static Doctor exampleSurgeon() {
