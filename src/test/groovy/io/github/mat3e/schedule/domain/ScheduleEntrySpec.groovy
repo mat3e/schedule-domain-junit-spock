@@ -20,7 +20,7 @@ class ScheduleEntrySpec extends Specification {
 
     @Shared
     @Subject
-    private static final ScheduleEntry entry = exampleEntry(start, end)
+    private static final ScheduleEntry entry = exampleEntry()
 
     def 'should interfere when the same start'() {
         expect:
@@ -81,38 +81,48 @@ class ScheduleEntrySpec extends Specification {
         thrown IllegalArgumentException
     }
 
-    def 'should add patient'() {
-        given:
-        def toTest = new ScheduleEntry(exampleSurgeon(), start, end, new Room('general'))
-
+    @Unroll
+    def 'is identified by its values (#description)'() {
         expect:
-        toTest.getPatient() == null
+        factory() == factory()
 
-        when:
-        toTest = toTest.withPatient(new Patient('Kowalski'))
-
-        then:
-        toTest.getPatient() != null
+        where:
+        factory << [
+                () -> new ScheduleEntry(
+                        new Doctor(Specialization.SURGEON),
+                        start,
+                        end,
+                        new Room('example'),
+                        new Patient('Frank')
+                ),
+                () -> new ScheduleEntry(
+                        new Doctor(Specialization.SURGEON),
+                        start,
+                        end,
+                        new Room('example')
+                )
+        ]
+        description << ['with patient', 'without patient']
     }
 
-    def 'should throw when adding patient and another patient exists'() {
-        given:
-        def toTest = new ScheduleEntry(
+    @Unroll
+    def 'should #condition a visit'() {
+        expect:
+        new ScheduleEntry(
                 exampleSurgeon(),
                 start,
                 end,
-                new Room('general'),
-                new Patient('first')
-        )
+                new Room('foo'),
+                potentialPatient
+        ).visit == expected
 
-        when:
-        toTest.withPatient(new Patient('second'))
-
-        then:
-        thrown DateAlreadyTakenException
+        where:
+        potentialPatient | expected | condition
+        null             | false    | 'NOT be'
+        new Patient('p') | true     | 'be'
     }
 
-    private static ScheduleEntry exampleEntry(ZonedDateTime from, ZonedDateTime to) {
+    private static ScheduleEntry exampleEntry(ZonedDateTime from = start, ZonedDateTime to = end) {
         new ScheduleEntry(
                 exampleSurgeon(),
                 from,

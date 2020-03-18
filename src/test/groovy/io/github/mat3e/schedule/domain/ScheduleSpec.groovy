@@ -1,7 +1,9 @@
 package io.github.mat3e.schedule.domain
 
+import org.jetbrains.annotations.NotNull
 import spock.lang.Specification
 import spock.lang.Subject
+import spock.lang.Unroll
 
 import java.time.Duration
 import java.time.ZonedDateTime
@@ -19,44 +21,44 @@ class ScheduleSpec extends Specification {
         toTest = new Schedule([])
     }
 
-    def 'should schedule a new on call date'() {
+    def 'should schedule a new on call'() {
         when:
-        toTest.scheduleOnCall(exampleEntry(start, end))
+        toTest.scheduleOnCall(exampleOnCall())
 
         then:
         noExceptionThrown()
 
         when: 'adding same entry once again'
-        toTest.scheduleOnCall(exampleEntry(start, end))
+        toTest.scheduleOnCall(exampleOnCall())
 
         then:
         thrown BusinessScheduleException
     }
 
-    def 'should throw when scheduling for the taken date (all rooms taken)'() {
+    def 'should throw when scheduling on call for the taken date (all rooms taken)'() {
         given:
-        toTest.scheduleOnCall(exampleEntry(start, end))
+        toTest.scheduleOnCall(exampleOnCall())
 
         when:
         def laterStart = start + Duration.of(1, HOURS)
         and:
-        toTest.scheduleOnCall(exampleEntry(laterStart, end))
+        toTest.scheduleOnCall(exampleOnCall(laterStart, end))
 
         then:
         thrown DateAlreadyTakenException
     }
 
-    def 'should throw when scheduling with the taken room'() {
+    def 'should throw when scheduling on call with the taken room'() {
         given:
-        def roomFoo = new Room('foo')
+        def room1 = new Room('1')
         and:
-        toTest = new Schedule([roomFoo, new Room('bar')])
+        toTest = new Schedule([room1, new Room('2')])
         and:
         toTest.scheduleOnCall(new ScheduleEntry(
                 exampleSurgeon(),
                 start,
                 end,
-                roomFoo
+                room1
         ))
 
         when:
@@ -64,22 +66,140 @@ class ScheduleSpec extends Specification {
                 exampleSurgeon(),
                 start + Duration.of(1, HOURS),
                 start + Duration.of(3, HOURS),
-                roomFoo
+                room1
         ))
 
         then:
         def e = thrown RoomAlreadyTakenException
-        e.message.contains(roomFoo.name)
+        e.message.contains(room1.name)
+    }
+
+    def 'should throw when scheduling on call with patient'() {
+        when:
+        toTest.scheduleOnCall(exampleVisit())
+
+        then:
+        thrown OnCallWithPatientException
     }
 
     def 'should throw when scheduling a visit with no patient'() {
-        expect:
-        true
+        when:
+        toTest.scheduleVisit(exampleOnCall())
+
+        then:
+        thrown NoPatientException
+    }
+
+    def 'should throw when scheduling a visit without a previous on call'() {
+        when:
+        toTest.scheduleVisit(exampleVisit())
+
+        then:
+        def e = thrown NoDoctorOnCallException
+        e.message.contains('corresponding on call')
+    }
+
+    def 'should throw when scheduling a visit with a different room than in on call'() {
+        given:
+        def firstRoom = new Room('1')
+        def secondRoom = new Room('2')
+        and:
+        toTest.scheduleOnCall(
+                new ScheduleEntry(
+                        exampleSurgeon(),
+                        start,
+                        end,
+                        firstRoom
+                )
+        )
+
+        when:
+        toTest.scheduleVisit(
+                new ScheduleEntry(
+                        exampleSurgeon(),
+                        start,
+                        end,
+                        secondRoom,
+                        examplePatient()
+                )
+        )
+
+        then:
+        def e = thrown RoomMismatchException
+        e.message.contains("in room $firstRoom.name")
+    }
+
+    @Unroll
+    def 'should throw when scheduling a visit interfering with a different visit (#description)'() {
+        given:
+        toTest.scheduleOnCall(exampleOnCall(start, end))
+        and:
+        toTest.scheduleVisit(
+                new ScheduleEntry(
+                        exampleSurgeon(),
+                        start,
+                        end,
+                        exampleRoom(),
+                        new Patient(firstName)
+                )
+        )
+
+        when:
+        toTest.scheduleVisit(
+                new ScheduleEntry(
+                        exampleSurgeon(),
+                        start,
+                        end,
+                        exampleRoom(),
+                        new Patient(secondName)
+                )
+        )
+
+        then:
+        def e = thrown VisitAlreadyScheduledException
+        e.message.contains('interfering visit')
+        e.message.contains(firstName)
+
+        where:
+        firstName | secondName | description
+        'Jack'    | 'Jack'     | 'same patient'
+        'Jack'    | 'John'     | 'different patient'
+    }
+
+    @Unroll
+    def 'should throw when scheduling a visit interfering with an empty slot (#description)'() {
+        given:
+        onCallStartDates.eachWithIndex { ZonedDateTime start, int i ->
+            toTest.scheduleOnCall(exampleOnCall(start, onCallEndDates[i]))
+        }
+
+        when:
+        toTest.scheduleVisit(exampleVisit())
+
+        then:
+        def e = thrown NoDoctorOnCallException
+        e.message.contains('not fully aligned')
+
+        where:
+        onCallStartDates                               | onCallEndDates                                            | description
+        [start.minusMinutes(30), end.minusMinutes(15)] | [end.minusMinutes(30), end.minusMinutes(15).plusHours(2)] | '15-min slot in the middle of a schedule'
+        [start.plusMinutes(15)]                        | [end]                                                     | 'visit starts before the on call'
+        [start]                                        | [end.minusMinutes(15)]                                    | 'visit ends after the on call'
     }
 
     def 'should schedule a new visit'() {
-        expect:
-        true
+        given:
+        toTest.scheduleOnCall(exampleOnCall(start.minusHours(1), end.plusHours(3)))
+
+        when:
+        toTest.scheduleVisit(exampleVisit())
+
+        then:
+        toTest.snapshot.entries == [
+                exampleOnCall(start.minusHours(1), start),
+                exampleVisit(),
+                exampleOnCall(end, end.plusHours(3))
+        ] as Set
     }
 
     def 'should throw when overriding on call with a doctor with a different specialization'() {
@@ -92,17 +212,36 @@ class ScheduleSpec extends Specification {
         true
     }
 
-    private static ScheduleEntry exampleEntry(ZonedDateTime from, ZonedDateTime to) {
+    @NotNull
+    private static ScheduleEntry exampleOnCall(ZonedDateTime from = start, ZonedDateTime to = end) {
         new ScheduleEntry(
                 exampleSurgeon(),
                 from,
                 to,
-                new Room('foo'),
-                new Patient('bar')
+                exampleRoom()
+        )
+    }
+
+    @NotNull
+    private static ScheduleEntry exampleVisit(ZonedDateTime from = start, ZonedDateTime to = end) {
+        new ScheduleEntry(
+                exampleSurgeon(),
+                from,
+                to,
+                exampleRoom(),
+                examplePatient()
         )
     }
 
     private static Doctor exampleSurgeon() {
         new Doctor(Specialization.SURGEON)
+    }
+
+    private static Room exampleRoom() {
+        new Room('1')
+    }
+
+    private static Patient examplePatient() {
+        new Patient('patient')
     }
 }

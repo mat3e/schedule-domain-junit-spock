@@ -7,3 +7,13 @@ internal sealed class BusinessScheduleException(description: String) : ScheduleE
 internal class DateAlreadyTakenException : BusinessScheduleException("Cannot schedule for a given date. All the rooms taken")
 
 internal class RoomAlreadyTakenException(room: Room) : BusinessScheduleException("Cannot schedule for a room \"${room.name}\"")
+
+internal class OnCallWithPatientException : BusinessScheduleException("Cannot schedule on call with patient")
+
+internal class NoPatientException : BusinessScheduleException("Cannot schedule a visit without a patient")
+
+internal class NoDoctorOnCallException(message: String) : BusinessScheduleException(message)
+
+internal class RoomMismatchException(onCallRoom: Room) : BusinessScheduleException("Doctor should be in room ${onCallRoom.name}")
+
+internal class VisitAlreadyScheduledException(existingPatient: Patient) : BusinessScheduleException("There are already interfering visits, e.g. for patient ${existingPatient.name}")

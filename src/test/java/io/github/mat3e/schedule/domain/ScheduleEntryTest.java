@@ -1,21 +1,24 @@
 package io.github.mat3e.schedule.domain;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.DynamicNode;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.ZonedDateTime;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 @Tag("unit")
 class ScheduleEntryTest {
@@ -96,37 +99,58 @@ class ScheduleEntryTest {
         );
     }
 
-    @Test
-    @DisplayName("should add patient")
-    void addPatient_addsToEmptySchedule() {
-        // given
-        var toTest = new ScheduleEntry(exampleSurgeon(), start, end, new Room("general"));
-        // expect
-        assertNull(toTest.getPatient());
-
-        // when
-        toTest = toTest.withPatient(new Patient("Kowalski"));
-
-        // then
-        assertNotNull(toTest.getPatient());
+    @TestFactory
+    @DisplayName("is identified by its values")
+    Stream<DynamicNode> generateEqualityTests() {
+        return Stream.<Supplier<ScheduleEntry>>of(
+                () -> new ScheduleEntry(
+                        new Doctor(Specialization.SURGEON),
+                        start,
+                        end,
+                        new Room("example"),
+                        new Patient("Frank")
+                ), () -> new ScheduleEntry(
+                        new Doctor(Specialization.SURGEON),
+                        start,
+                        end,
+                        new Room("example")
+                )
+        ).map(factory ->
+                dynamicTest(
+                        factory.get().getPatient() != null ? "with patient" : "without patient",
+                        () -> assertEquals(factory.get(), factory.get())
+                )
+        );
     }
 
-    @Test
-    @DisplayName("should throw when adding patient and another patient exists")
-    void addPatient_throwsWhenPatientExists() {
-        // given
-        var toTest = new ScheduleEntry(
-                exampleSurgeon(),
-                start,
-                end,
-                new Room("general"),
-                new Patient("first")
-        );
+    @TestFactory
+    @DisplayName("can be a visit")
+    Stream<DynamicNode> generateIsVisitTests() {
+        return Stream.of(
+                new Patient("p"),
+                null
+        ).map(potentialPatient -> {
+                    boolean expected = potentialPatient != null;
+                    return dynamicTest(
+                            "should" + (expected ? " " : " NOT ") + "be a visit",
+                            () -> {
+                                // given
+                                var entry = new ScheduleEntry(
+                                        exampleSurgeon(),
+                                        start,
+                                        end,
+                                        new Room("123"),
+                                        potentialPatient
+                                );
 
-        // expect
-        assertThrows(
-                DateAlreadyTakenException.class,
-                () -> toTest.withPatient(new Patient("second"))
+                                // when
+                                boolean result = entry.isVisit();
+
+                                // then
+                                assertEquals(expected, result);
+                            }
+                    );
+                }
         );
     }
 
