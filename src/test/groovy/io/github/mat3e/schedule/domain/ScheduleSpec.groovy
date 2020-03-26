@@ -202,14 +202,41 @@ class ScheduleSpec extends Specification {
         ] as Set
     }
 
-    def 'should throw when overriding on call with a doctor with a different specialization'() {
-        expect:
-        true
+    def 'should throw when erasing with wrong dates'() {
+        when:
+        toTest.erase(end, start)
+
+        then:
+        thrown IllegalArgumentException
     }
 
-    def 'should override on call'() {
-        expect:
-        true
+    def 'should throw when no entries to be erased'() {
+        given:
+        toTest.scheduleOnCall(exampleOnCall(start, end))
+        toTest.scheduleOnCall(exampleOnCall(end.plusHours(2), end.plusHours(4)))
+
+        when:
+        toTest.erase(end, end.plusHours(2))
+
+        then:
+        thrown NothingToEraseException
+    }
+
+    def 'should erase entries'() {
+        given:
+        toTest.scheduleOnCall(exampleOnCall())
+        toTest.scheduleOnCall(exampleOnCall(end + Duration.of(1, HOURS), end + Duration.of(2, HOURS)))
+        toTest.scheduleOnCall(exampleOnCall(end + Duration.of(3, HOURS), end + Duration.of(5, HOURS)))
+        toTest.scheduleVisit(exampleVisit(end + Duration.of(3, HOURS), end + Duration.of(5, HOURS)))
+
+        when:
+        toTest.erase(end - Duration.of(1, HOURS), end + Duration.of(4, HOURS))
+        and:
+        List<ScheduleEntry> result = toTest.snapshot.entries.sort { it.from }
+
+        then:
+        result[0] == exampleOnCall(start, end - Duration.of(1, HOURS))
+        result[1] == exampleVisit(end + Duration.of(4, HOURS), end + Duration.of(5, HOURS))
     }
 
     @NotNull

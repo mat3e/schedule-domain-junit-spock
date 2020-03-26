@@ -25,12 +25,18 @@ data class ScheduleEntry @JvmOverloads constructor(
         val room: Room,
         val patient: Patient? = null
 ) {
-    private val range: ClosedRange<ZonedDateTime> = from..to
+    companion object {
+        @JvmStatic
+        fun dummy(from: ZonedDateTime, to: ZonedDateTime) =
+                ScheduleEntry(Doctor(Specialization.SURGEON), from, to, Room("dummy"))
+    }
+
+    internal val range: ClosedRange<ZonedDateTime> = from..to
     val isVisit: Boolean = patient != null
 
     init {
         if (range.isEmpty()) {
-            throw IllegalArgumentException("$from should be less than $to")
+            throw IllegalArgumentException("Start ($from) should be before end ($to)")
         }
     }
 
@@ -55,27 +61,24 @@ data class ScheduleEntry @JvmOverloads constructor(
         if (this cannotBeImmersedInto entries) {
             return entries
         }
-        val totalRange: ClosedRange<ZonedDateTime> = entries
-                .sortedBy { it.from }
-                .map { it.range }
-                .reduce { totalRange, currentRange ->
-                    when {
-                        totalRange.isEmpty() -> totalRange
-                        totalRange canBeMergedWith currentRange -> totalRange.start..currentRange.endInclusive
-                        else -> emptyRange()
-                    }
-                }
+        val totalRange: ClosedRange<ZonedDateTime> = entries.squashToRange()
         if (this notFullyIncludedIn totalRange) {
             return entries
         }
-        return Stream.concat(
-                Stream.of(this),
-                Stream.concat(
-                        convertToOnCallWithDates(totalRange.start, this.from).stream(),
-                        convertToOnCallWithDates(this.to, totalRange.endInclusive).stream()
-                )
-        ).collect(toSet())
+        return totalRange unsquashUsing this
     }
+
+    internal fun convertToOnCallWithDates(start: ZonedDateTime, end: ZonedDateTime): Optional<ScheduleEntry> =
+            Optional.of(start)
+                    .filter { start < end }
+                    .map { copy(from = start, to = end, patient = null) }
+
+    internal fun trimTo(other: ScheduleEntry): Optional<ScheduleEntry> = Optional.ofNullable(when {
+        other.range.start < range.start && other.range.endInclusive > range.endInclusive -> null
+        to within other.range -> copy(to = other.from)
+        from within other.range -> copy(from = other.to)
+        else -> this
+    })
 
     internal infix fun datesInterfereWith(other: ScheduleEntry): Boolean =
             other.from within this.range || this.from within other.range
@@ -88,20 +91,37 @@ data class ScheduleEntry @JvmOverloads constructor(
 
     private infix fun notFullyIncludedIn(totalRange: ClosedRange<ZonedDateTime>): Boolean =
             totalRange.isEmpty() || this.from !in totalRange || this.to !in totalRange
-
-    private fun convertToOnCallWithDates(start: ZonedDateTime, end: ZonedDateTime): Optional<ScheduleEntry> =
-            Optional.of(start)
-                    .filter { start < end }
-                    .map { copy(from = start, to = end, patient = null) }
 }
 
 data class ScheduleSnapshot(val clinicId: UUID, val entries: Set<ScheduleEntry>)
 
-// exclusive end in range
+// merges all entries into one from-to block (if no empty slots in between)
+private fun Set<ScheduleEntry>.squashToRange(): ClosedRange<ZonedDateTime> =
+        this.sortedBy { it.from }
+                .map { it.range }
+                .reduce { totalRange, currentRange ->
+                    when {
+                        totalRange.isEmpty() -> totalRange
+                        totalRange canBeMergedWith currentRange -> totalRange.start..currentRange.endInclusive
+                        else -> emptyRange()
+                    }
+                }
+
+// divides range into 2 on calls and 1 visit between them (edge case - just 1 on call either before or after the visit)
+private infix fun ClosedRange<ZonedDateTime>.unsquashUsing(entry: ScheduleEntry) =
+        Stream.concat(
+                Stream.of(entry),
+                Stream.concat(
+                        entry.convertToOnCallWithDates(this.start, entry.from).stream(),
+                        entry.convertToOnCallWithDates(entry.to, this.endInclusive).stream()
+                )
+        ).collect(toSet())
+
+// uses exclusive end in range
 private infix fun ZonedDateTime.within(range: ClosedRange<ZonedDateTime>): Boolean =
         this in range && this < range.endInclusive
 
-// range right after another range
+// checks if range right after another range
 private infix fun ClosedRange<ZonedDateTime>.canBeMergedWith(other: ClosedRange<ZonedDateTime>): Boolean =
         this.endInclusive == other.start
 

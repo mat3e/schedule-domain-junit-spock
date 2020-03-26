@@ -6,7 +6,7 @@ internal sealed class BusinessScheduleException(description: String) : ScheduleE
 
 internal class DateAlreadyTakenException : BusinessScheduleException("Cannot schedule for a given date. All the rooms taken")
 
-internal class RoomAlreadyTakenException(room: Room) : BusinessScheduleException("Cannot schedule for a room \"${room.name}\"")
+internal class RoomAlreadyTakenException(takenRoom: Room) : BusinessScheduleException("Cannot schedule for a room \"${takenRoom.name}\"")
 
 internal class OnCallWithPatientException : BusinessScheduleException("Cannot schedule on call with patient")
 
@@ -17,3 +17,5 @@ internal class NoDoctorOnCallException(message: String) : BusinessScheduleExcept
 internal class RoomMismatchException(onCallRoom: Room) : BusinessScheduleException("Doctor should be in room ${onCallRoom.name}")
 
 internal class VisitAlreadyScheduledException(existingPatient: Patient) : BusinessScheduleException("There are already interfering visits, e.g. for patient ${existingPatient.name}")
+
+internal class NothingToEraseException : BusinessScheduleException("There are no entries to erase")

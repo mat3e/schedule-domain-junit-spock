@@ -2,6 +2,7 @@ package io.github.mat3e.schedule.domain;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.time.ZonedDateTime;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Optional;
@@ -9,7 +10,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static java.util.Collections.unmodifiableSet;
-import static java.util.stream.Collectors.toSet;
+import static java.util.stream.Collectors.toUnmodifiableSet;
 
 public class Schedule {
     private final UUID clinicId;
@@ -31,7 +32,7 @@ public class Schedule {
         entries.add(newEntry);
     }
 
-    void scheduleVisit(final ScheduleEntry entry) {
+    public void scheduleVisit(final ScheduleEntry entry) {
         assertPatientDefined(entry);
         Set<ScheduleEntry> interferingEntries = findInterferingDoctorEntries(entry);
         assertDoctorOnCall(interferingEntries);
@@ -41,6 +42,19 @@ public class Schedule {
         if (newEntries.equals(interferingEntries)) {
             throw new NoDoctorOnCallException("Doctor's on calls are not fully aligned with the visit");
         }
+        entries.removeAll(interferingEntries);
+        entries.addAll(newEntries);
+    }
+
+    public void erase(final ZonedDateTime from, final ZonedDateTime to) {
+        var dummyEntry = ScheduleEntry.dummy(from, to);
+        Set<ScheduleEntry> interferingEntries = entries.stream()
+                .filter(entry -> entry.datesInterfereWith$schedule(dummyEntry))
+                .collect(toUnmodifiableSet());
+        assertEntriesPresent(interferingEntries);
+        Set<ScheduleEntry> newEntries = interferingEntries.stream()
+                .flatMap(entry -> entry.trimTo$schedule(dummyEntry).stream())
+                .collect(toUnmodifiableSet());
         entries.removeAll(interferingEntries);
         entries.addAll(newEntries);
     }
@@ -62,7 +76,7 @@ public class Schedule {
         Set<Room> interferingRooms = entries.stream()
                 .filter(existingVisit -> existingVisit.interferesWith(newEntry))
                 .map(ScheduleEntry::getRoom)
-                .collect(toSet());
+                .collect(toUnmodifiableSet());
         if (interferingRooms.size() > 0) {
             availableRooms.stream()
                     .filter(room -> !interferingRooms.contains(room))
@@ -89,7 +103,7 @@ public class Schedule {
         return entries.stream()
                 .filter(onCall -> onCall.getDoctor().equals(entry.getDoctor()))
                 .filter(onCall -> onCall.datesInterfereWith$schedule(entry))
-                .collect(toSet());
+                .collect(toUnmodifiableSet());
     }
 
     private void assertDoctorOnCall(final Set<ScheduleEntry> interferingEntries) {
@@ -115,6 +129,12 @@ public class Schedule {
                 .findAny();
         if (otherPatient.isPresent()) {
             throw new VisitAlreadyScheduledException(otherPatient.get());
+        }
+    }
+
+    private void assertEntriesPresent(final Set<ScheduleEntry> entriesToErase) {
+        if (entriesToErase.isEmpty()) {
+            throw new NothingToEraseException();
         }
     }
 }

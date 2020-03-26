@@ -12,11 +12,13 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptySet;
 import static java.util.Comparator.comparing;
+import static java.util.stream.Collectors.toUnmodifiableList;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -263,13 +265,47 @@ class ScheduleTest {
     }
 
     @Test
-    @DisplayName("should throw when overriding on call with a doctor with a different specialization")
-    void overrideOnCall_throwsWhenDifferentSpecialization() {
+    @DisplayName("should throw when erasing with wrong dates")
+    void erase_throwsWhenWrongDates() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> toTest.erase(end, start)
+        );
     }
 
     @Test
-    @DisplayName("should override on call")
-    void overrideOnCall_worksAsExpected() {
+    @DisplayName("should throw when no entries to be erased")
+    void erase_throwsWhenNoEntryCollides() {
+        // given
+        toTest.scheduleOnCall(exampleOnCall(start, end));
+        toTest.scheduleOnCall(exampleOnCall(end.plusHours(2), end.plusHours(4)));
+
+        // expect
+        assertThrows(
+                NothingToEraseException.class,
+                () -> toTest.erase(end, end.plusHours(2))
+        );
+    }
+
+    @Test
+    @DisplayName("should erase entries")
+    void erase_worksAsExpected() {
+        // given
+        toTest.scheduleOnCall(exampleOnCall(start, end));
+        toTest.scheduleOnCall(exampleOnCall(end.plusHours(1), end.plusHours(2)));
+        toTest.scheduleOnCall(exampleOnCall(end.plusHours(3), end.plusHours(5)));
+        toTest.scheduleVisit(exampleVisit(end.plusHours(3), end.plusHours(5)));
+
+        // when
+        toTest.erase(end.minusHours(1), end.plusHours(4));
+        // and
+        List<ScheduleEntry> result = toTest.getSnapshot().getEntries().stream()
+                .sorted(comparing(ScheduleEntry::getFrom))
+                .collect(toUnmodifiableList());
+
+        // then
+        assertEquals(result.get(0), exampleOnCall(start, end.minusHours(1)));
+        assertEquals(result.get(1), exampleVisit(end.plusHours(4), end.plusHours(5)));
     }
 
     @NotNull
