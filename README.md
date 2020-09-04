@@ -1,6 +1,8 @@
 # Schedule domain - JUnit, Spock
 One domain, 2 testing frameworks, 3 JVM languages.
 
+Example for [JUnit 5 vs. Spock](https://github.com/mat3e/talks/tree/master/docs/junit-spock) tech talk.
+
 ## Problem
 Mixing doctors and patients together:
 [![EventStorming session](./schedule.png)](./schedule.png)
